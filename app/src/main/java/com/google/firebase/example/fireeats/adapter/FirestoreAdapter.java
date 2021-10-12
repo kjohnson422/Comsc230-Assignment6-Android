@@ -36,6 +36,69 @@ import java.util.ArrayList;
  */
 public abstract class FirestoreAdapter<VH extends RecyclerView.ViewHolder>
         extends RecyclerView.Adapter<VH> {
+        implements EventListener<QuerySnapshot>{
+        @Override
+        public void onEvent(QuerySnapshot documentSnapshots,
+                FirebaseFirestoreException e) {
+
+            // Handle errors
+            if (e != null) {
+                Log.w(TAG, "onEvent:error", e);
+                return;
+            }
+
+            // Dispatch the event
+            for (DocumentChange change : documentSnapshots.getDocumentChanges()) {
+                // Snapshot of the changed document
+                DocumentSnapshot snapshot = change.getDocument();
+
+                switch (change.getType()) {
+                    case ADDED:
+                        onDocumentAdded(change);
+                        break;
+                    case MODIFIED:
+                        onDocumentModified(change);
+                        break;
+                    case REMOVED:
+                        onDocumentRemoved(change);
+                        break;
+                }
+            }
+
+            onDataChanged();
+        }
+
+    }
+    }
+
+    public void startListening() {
+        if (mQuery != null && mRegistration == null) {
+            mRegistration = mQuery.addSnapshotListener(this);
+        }
+    }
+
+    protected void onDocumentAdded(DocumentChange change) {
+        mSnapshots.add(change.getNewIndex(), change.getDocument());
+        notifyItemInserted(change.getNewIndex());
+    }
+
+    protected void onDocumentModified(DocumentChange change) {
+        if (change.getOldIndex() == change.getNewIndex()) {
+            // Item changed but remained in same position
+            mSnapshots.set(change.getOldIndex(), change.getDocument());
+            notifyItemChanged(change.getOldIndex());
+        } else {
+            // Item changed and changed position
+            mSnapshots.remove(change.getOldIndex());
+            mSnapshots.add(change.getNewIndex(), change.getDocument());
+            notifyItemMoved(change.getOldIndex(), change.getNewIndex());
+        }
+    }
+
+    protected void onDocumentRemoved(DocumentChange change) {
+        mSnapshots.remove(change.getOldIndex());
+        notifyItemRemoved(change.getOldIndex());
+    }
 
     private static final String TAG = "Firestore Adapter";
 
